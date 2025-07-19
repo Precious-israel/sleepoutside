@@ -5,7 +5,7 @@ import Alert from "./alert.js";
 
 // locates the root index.html file and renders the alert there
 if (window.location.pathname === "/index.html") {
-  const alert = new Alert("/json/alerts.json");
+  const alert = new Alert("json/alerts.json");
   alert.render(document.querySelector("main"));
 }
 

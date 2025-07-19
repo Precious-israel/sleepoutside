@@ -4,6 +4,9 @@ import { defineConfig } from "vite";
 export default defineConfig({
   root: "src/",
 
+  // 🔥 Important for GitHub Pages – use your repo name exactly here
+  base: "/sleepoutside/",
+
   build: {
     outDir: "../dist",
     rollupOptions: {
