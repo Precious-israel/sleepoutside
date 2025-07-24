@@ -69,7 +69,7 @@ function cartItemTemplate(item) {
 
 function calculateCartTotal(items) {
   return items.reduce((sum, item) => {
-    return sum + Number(item.FinalPrice) * item.Quantity;
+    sum + Number(item.FinalPrice) * item.Quantity;
   }, 0);
 }
 
