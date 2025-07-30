@@ -1,119 +1,151 @@
-import { getLocalStorage, setLocalStorage } from "./utils.mjs";
+import { getLocalStorage, setLocalStorage, updateCartCount } from "./utils.mjs";
 
 function renderCartContents() {
-  const rawCartItems = getLocalStorage("so-cart") || [];
+  const cartItems = getLocalStorage("so-cart") || [];
   const productList = document.querySelector(".product-list");
-  const cartFooter = document.querySelector(".cart-sum");
-  const cartTotal = document.querySelector(".cart-total");
+  const emptyCartMessage = document.querySelector(".empty-cart-message");
+  const cartHeader = document.querySelector(".cart-header h1");
 
-  if (rawCartItems.length === 0) {
-    productList.innerHTML = "<p>Your cart is empty.</p>";
-    cartFooter.classList.add("hide");
+  if (cartItems.length === 0) {
+    productList.innerHTML = "";
+    emptyCartMessage.style.display = "block";
+    cartHeader.textContent = "Your Cart is Empty";
+    renderCartTotal();
+    updateCartCount();
     return;
   }
 
-  const groupedItems = groupCartItems(rawCartItems);
-  const htmlItems = groupedItems.map(cartItemTemplate);
+  emptyCartMessage.style.display = "none";
+  cartHeader.textContent = `Your Cart (${cartItems.length} Items)`;
+
+  const htmlItems = cartItems.map((item, index) => cartItemTemplate(item, index));
   productList.innerHTML = htmlItems.join("");
 
-  const total = calculateCartTotal(groupedItems);
-  cartTotal.textContent = `Total: $${total.toFixed(2)}`;
-  cartFooter.classList.remove("hide");
-
-  attachQuantityEvents(rawCartItems);
+  attachEventListeners();
+  renderCartTotal();
+  updateCartCount();
 }
 
-function groupCartItems(items) {
-  const grouped = {};
-  items.forEach((item) => {
-    const key = item.Id;
-    if (!grouped[key]) {
-      grouped[key] = { ...item, Quantity: 1 };
-    } else {
-      grouped[key].Quantity += 1;
-    }
-  });
-  return Object.values(grouped);
-}
+function cartItemTemplate(item, index) {
+  const image = item?.Image || "/images/placeholder.jpg";
+  const name = item?.Name || "Unknown Item";
+  const price = parseFloat(item?.FinalPrice) || 0;
+  const color = item?.Colors?.[0]?.ColorName || "N/A";
+  const quantity = item?.Quantity || 1;
 
-function cartItemTemplate(item) {
   return `
-    <li class="cart-card enhanced-cart-card" data-id="${item.Id}">
-      <div class="cart-card__image-wrapper">
-        <a href="#" class="cart-card__image">
-          <img src="${item.Image}" alt="${item.Name}" />
-        </a>
-      </div>
+    <li class="cart-card">
+      <a href="#" class="cart-card__image">
+        <img src="${image}" alt="${name}" loading="lazy">
+      </a>
       <div class="cart-card__details">
-        <a href="#">
-          <h2 class="card__name">${item.Name}</h2>
-        </a>
-        <p class="cart-card__color">Color: ${item.Colors?.[0]?.ColorName || "N/A"}</p>
-        <div class="cart-card__controls">
-          <div class="quantity-section">
-            <button class="quantity-btn decrease-btn">–</button>
-            <span class="cart-card__quantity">Qty: ${item.Quantity}</span>
-            <button class="quantity-btn increase-btn">+</button>
-          </div>
-          <div class="price-section">
-            <p class="cart-card__price">$${item.FinalPrice}</p>
-          </div>
-          <div class="delete-section">
-            <button class="delete-btn">🗑 Remove</button>
-          </div>
+        <a href="#" class="card__name">${name}</a>
+        <p class="cart-card__color">Color: ${color}</p>
+        
+        <div class="price-row">
+          <span class="unit-price">$${price.toFixed(2)} each</span>
+          <span class="total-price">$${(price * quantity).toFixed(2)}</span>
         </div>
+        
+        <div class="quantity-control">
+          <span class="quantity-label">Qty:</span>
+          <button class="qty-btn decrease" data-index="${index}" aria-label="Decrease quantity">−</button>
+          <input type="number" class="cart-card__quantity-input" 
+                 min="1" value="${quantity}" data-index="${index}" aria-label="Quantity">
+          <button class="qty-btn increase" data-index="${index}" aria-label="Increase quantity">+</button>
+        </div>
+        
+        <button class="remove-btn" data-index="${index}">
+          <svg viewBox="0 0 24 24" width="14" height="14">
+            <path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" />
+          </svg>
+          Remove
+        </button>
       </div>
     </li>
   `;
 }
 
-function calculateCartTotal(items) {
-  return items.reduce((sum, item) => {
-    return sum + Number(item.FinalPrice) * item.Quantity;
-  }, 0);
-}
+function attachEventListeners() {
+  // Quantity input changes
+  document.querySelectorAll(".cart-card__quantity-input").forEach(input => {
+    input.addEventListener("change", (e) => {
+      const index = e.target.dataset.index;
+      const newQty = parseInt(e.target.value);
+      updateQuantity(index, newQty);
+    });
+  });
 
-function attachQuantityEvents(rawCartItems) {
-  const increaseButtons = document.querySelectorAll(".increase-btn");
-  const decreaseButtons = document.querySelectorAll(".decrease-btn");
-  const deleteButtons = document.querySelectorAll(".delete-btn");
-
-  increaseButtons.forEach((btn) => {
+  // Increase quantity buttons
+  document.querySelectorAll(".qty-btn.increase").forEach(btn => {
     btn.addEventListener("click", (e) => {
-      const itemId = getItemId(e.target);
-      const itemToAdd = rawCartItems.find((item) => item.Id === itemId);
-      if (itemToAdd) {
-        rawCartItems.push(itemToAdd);
-        setLocalStorage("so-cart", rawCartItems);
+      const index = e.target.dataset.index;
+      const cartItems = getLocalStorage("so-cart");
+      cartItems[index].Quantity += 1;
+      setLocalStorage("so-cart", cartItems);
+      renderCartContents();
+    });
+  });
+
+  // Decrease quantity buttons
+  document.querySelectorAll(".qty-btn.decrease").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const index = e.target.dataset.index;
+      const cartItems = getLocalStorage("so-cart");
+      if (cartItems[index].Quantity > 1) {
+        cartItems[index].Quantity -= 1;
+        setLocalStorage("so-cart", cartItems);
         renderCartContents();
       }
     });
   });
 
-  decreaseButtons.forEach((btn) => {
+  // Remove item buttons
+  document.querySelectorAll(".remove-btn").forEach(btn => {
     btn.addEventListener("click", (e) => {
-      const itemId = getItemId(e.target);
-      const index = rawCartItems.findIndex((item) => item.Id === itemId);
-      if (index !== -1) {
-        rawCartItems.splice(index, 1);
-        setLocalStorage("so-cart", rawCartItems);
-        renderCartContents();
-      }
-    });
-  });
-
-  deleteButtons.forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const itemId = getItemId(e.target);
-      const updatedCart = rawCartItems.filter((item) => item.Id !== itemId);
-      setLocalStorage("so-cart", updatedCart);
+      const index = e.target.dataset.index;
+      const cartItems = getLocalStorage("so-cart");
+      cartItems.splice(index, 1);
+      setLocalStorage("so-cart", cartItems);
       renderCartContents();
     });
   });
 }
 
-function getItemId(element) {
-  return element.closest(".cart-card").getAttribute("data-id");
+function updateQuantity(index, newQty) {
+  const validatedQty = Math.max(1, isNaN(newQty) ? 1 : newQty);
+  const cartItems = getLocalStorage("so-cart");
+  cartItems[index].Quantity = validatedQty;
+  setLocalStorage("so-cart", cartItems);
+  renderCartContents();
 }
 
-renderCartContents();
+function renderCartTotal() {
+  const cartItems = getLocalStorage("so-cart") || [];
+  const checkoutBtn = document.querySelector(".checkout-button");
+
+  let itemCount = 0;
+  let subtotal = 0;
+
+  cartItems.forEach(item => {
+    const quantity = item.Quantity || 1;
+    itemCount += quantity;
+    subtotal += (item.FinalPrice || 0) * quantity;
+  });
+
+  const tax = subtotal * 0.06;
+  const shipping = itemCount > 0 ? 10 + (itemCount - 1) * 2 : 0;
+  const total = subtotal + tax + shipping;
+
+  document.getElementById("cart-subtotal").textContent = `$${subtotal.toFixed(2)}`;
+  document.getElementById("cart-tax").textContent = `$${tax.toFixed(2)}`;
+  document.getElementById("cart-shipping").textContent = `$${shipping.toFixed(2)}`;
+  document.getElementById("cart-total").textContent = `$${total.toFixed(2)}`;
+
+  checkoutBtn.disabled = cartItems.length === 0;
+}
+
+// Initialize cart on page load
+document.addEventListener("DOMContentLoaded", () => {
+  renderCartContents();
+});
