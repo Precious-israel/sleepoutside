@@ -4,8 +4,11 @@ import { defineConfig } from "vite";
 export default defineConfig({
   root: "src/",
 
+  base: "/sleepoutside/",
+
   build: {
     outDir: "../dist",
+    emptyOutDir: true,
     rollupOptions: {
       input: {
         main: resolve(__dirname, "src/index.html"),
